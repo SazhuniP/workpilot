@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function isRootAdmin() {
+      return isSignedIn() && request.auth.token.email == 'sazhuni@gmail.com';
+    }
+
+    function isAdmin() {
+      return isRootAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    function isProjectMember(projectId) {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/projects/$(projectId)) &&
+        request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.members
+      );
+    }
+
+    // --- User Rules ---
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['uid', 'email', 'role']) &&
+               data.uid is string && data.email is string &&
+               data.role in ['admin', 'member'] &&
+               (data.keys().size() <= 10); // Basic size limit
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isRootAdmin();
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && (
+        incoming().role == 'member' || isRootAdmin()
+      ); 
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
+        (isOwner(userId) && (incoming().role == existing().role || isRootAdmin())) || 
+        isAdmin()
+      );
+    }
+
+    // --- Project Rules ---
+    match /projects/{projectId} {
+      function isValidProject(data) {
+        return data.keys().hasAll(['name', 'ownerId', 'members']) &&
+               data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+               data.ownerId is string && data.members is list &&
+               data.members.size() <= 50;
+      }
+
+      allow get: if isValidId(projectId) && (isProjectMember(projectId) || isAdmin());
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.members || isRootAdmin());
+      allow create: if isSignedIn() && isValidProject(incoming()) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(projectId) && (isOwner(existing().ownerId) || isAdmin()) && isValidProject(incoming());
+      allow delete: if isValidId(projectId) && (isOwner(existing().ownerId) || isAdmin());
+    }
+
+    // --- Task Rules ---
+    match /projects/{projectId}/tasks/{taskId} {
+      function isValidTask(data) {
+        return data.keys().hasAll(['projectId', 'title', 'status', 'priority', 'creatorId']) &&
+               data.projectId == projectId &&
+               data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+               data.status in ['todo', 'in-progress', 'completed'] &&
+               data.priority in ['low', 'medium', 'high'] &&
+               data.creatorId is string;
+      }
+
+      allow get: if isSignedIn() && (isProjectMember(projectId) || isAdmin());
+      allow list: if isSignedIn() && (
+        resource.data.get('assigneeId', '') == request.auth.uid || 
+        resource.data.creatorId == request.auth.uid || 
+        isRootAdmin()
+      );
+      allow create: if isProjectMember(projectId) && isValidTask(incoming()) && incoming().creatorId == request.auth.uid;
+      allow update: if (isProjectMember(projectId) || isAdmin()) && isValidTask(incoming());
+      allow delete: if (isProjectMember(projectId) || isAdmin());
+    }
+
+    match /{path=**}/tasks/{taskId} {
+      allow list: if isSignedIn() && (
+        resource.data.get('assigneeId', '') == request.auth.uid || 
+        resource.data.creatorId == request.auth.uid || 
+        isRootAdmin()
+      );
+    }
+  }
+}
