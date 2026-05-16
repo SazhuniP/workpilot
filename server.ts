@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -53,50 +53,68 @@ async function seedData() {
 async function startServer() {
   const app = express();
 
-  // MongoDB Connection
-  let MONGODB_URI = process.env.MONGODB_URI;
-  
-  if (!MONGODB_URI || MONGODB_URI === '123') {
-    console.warn('Valid MONGODB_URI not found. Starting In-Memory MongoDB Server for demo purposes...');
-    try {
-      const mongoServer = await MongoMemoryServer.create();
-      MONGODB_URI = mongoServer.getUri();
-      console.log('In-Memory MongoDB started');
-    } catch (err) {
-      console.error('Failed to start In-Memory MongoDB:', err);
-    }
-  }
-
-  if (MONGODB_URI) {
-    try {
-      await mongoose.connect(MONGODB_URI);
-      console.log('MongoDB connected successfully');
-      await seedData();
-    } catch (err) {
-      console.error('MongoDB connection error:', err);
-      console.log('Attempting fallback to In-Memory MongoDB...');
-      try {
-        const mongoServer = await MongoMemoryServer.create();
-        const fallbackUri = mongoServer.getUri();
-        await mongoose.disconnect();
-        await mongoose.connect(fallbackUri);
-        console.log('Connected to In-Memory MongoDB fallback');
-        await seedData();
-      } catch (fallbackErr) {
-        console.error('Final Mongo connection failed:', fallbackErr);
-      }
-    }
-  }
-
   app.use(express.json());
   app.use(cors());
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
+  });
 
   // API Routes
   app.use('/api/auth', authRoutes);
   app.use('/api/projects', projectRoutes);
   app.use('/api/tasks', taskRoutes);
 
-  // Vite middleware for development
+  // Error handling middleware
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error('Unhandled Error:', err);
+    res.status(err.status || 500).json({
+      status: 'error',
+      message: err.message || 'Internal Server Error'
+    });
+  });
+
+  // MongoDB Connection in background to not block boot
+  const connectDB = async () => {
+    let MONGODB_URI = process.env.MONGODB_URI;
+    
+    if (!MONGODB_URI || MONGODB_URI === '123') {
+      console.warn('Valid MONGODB_URI not found. Starting In-Memory MongoDB Server...');
+      try {
+        const mongoServer = await MongoMemoryServer.create();
+        MONGODB_URI = mongoServer.getUri();
+        console.log('In-Memory MongoDB URI generated');
+      } catch (err) {
+        console.error('Failed to start In-Memory MongoDB:', err);
+      }
+    }
+
+    if (MONGODB_URI) {
+      try {
+        await mongoose.connect(MONGODB_URI);
+        console.log('MongoDB connected successfully');
+        await seedData();
+      } catch (err) {
+        console.error('MongoDB connection error:', err);
+        console.log('Attempting fallback to In-Memory MongoDB...');
+        try {
+          const mongoServer = await MongoMemoryServer.create();
+          const fallbackUri = mongoServer.getUri();
+          await mongoose.disconnect();
+          await mongoose.connect(fallbackUri);
+          console.log('Connected to In-Memory MongoDB fallback');
+          await seedData();
+        } catch (fallbackErr) {
+          console.error('Final Mongo connection failed:', fallbackErr);
+        }
+      }
+    }
+  };
+
+  connectDB();
+
+  // SPA Serving
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -116,4 +134,6 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+});

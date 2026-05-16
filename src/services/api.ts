@@ -18,7 +18,16 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    const result = await res.json();
+    
+    let result;
+    const text = await res.text();
+    try {
+      result = JSON.parse(text);
+    } catch (e) {
+      console.error('JSON Parse Error. Server response:', text);
+      throw new Error(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
+    }
+
     if (!res.ok) throw new Error(result.message || 'Signup failed');
     return result;
   },
@@ -29,7 +38,16 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    const result = await res.json();
+    
+    let result;
+    const text = await res.text();
+    try {
+      result = JSON.parse(text);
+    } catch (e) {
+      console.error('JSON Parse Error. Server response:', text);
+      throw new Error(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
+    }
+
     if (!res.ok) throw new Error(result.message || 'Login failed');
     return result;
   },
