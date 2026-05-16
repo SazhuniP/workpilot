@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collectionGroup, query, where, onSnapshot, collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Task, Project } from '../types';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
@@ -22,48 +21,45 @@ export default function TasksPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Fetch user's projects for the dropdown
-    const fetchProjects = async () => {
-      const q = query(collection(db, 'projects'), where('members', 'array-contains', user.uid));
-      const snap = await getDocs(q);
-      const projs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Project[];
-      setProjects(projs);
-      
-      // Check for projectId in URL
-      const params = new URLSearchParams(window.location.search);
-      const urlProjectId = params.get('projectId');
-      
-      if (urlProjectId && projs.some(p => p.id === urlProjectId)) {
-        setSelectedProjectId(urlProjectId);
-      } else if (projs.length > 0) {
-        setSelectedProjectId(projs[0].id);
+    const fetchData = async () => {
+      try {
+        const projs = await api.getProjects();
+        setProjects(projs);
+        
+        const params = new URLSearchParams(window.location.search);
+        const urlProjectId = params.get('projectId');
+        
+        if (urlProjectId && projs.some((p: any) => p.id === urlProjectId || p._id === urlProjectId)) {
+          setSelectedProjectId(urlProjectId);
+        } else if (projs.length > 0) {
+          setSelectedProjectId(projs[0]._id || projs[0].id);
+        }
+      } catch (err) {
+        console.error("Error fetching projects:", err);
       }
     };
-    fetchProjects();
+    fetchData();
   }, [user]);
 
   useEffect(() => {
-    if (!user || !selectedProjectId) return;
+    if (!user) return;
 
-    const q = query(
-      collectionGroup(db, 'tasks'),
-      where('projectId', '==', selectedProjectId)
-    );
+    const fetchTasks = async () => {
+      try {
+        const tasksData = await api.getTasks();
+        // Filter by project if selected
+        const filteredTasks = selectedProjectId 
+          ? tasksData.filter((t: any) => t.projectId === selectedProjectId)
+          : tasksData;
+        setTasks(filteredTasks);
+      } catch (err) {
+        console.error("Tasks fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tasksData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Task[];
-      setTasks(tasksData);
-      setLoading(false);
-    }, (err) => {
-      console.warn("Tasks fetch error (likely missing index):", err);
-      // Fallback for demo if index hasn't been created yet
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchTasks();
   }, [user, selectedProjectId]);
 
   const handleCreateTask = async (e: React.FormEvent, forceStatus?: string) => {
@@ -73,17 +69,21 @@ export default function TasksPage() {
     setIsCreating(true);
     try {
       const status = forceStatus || 'todo';
-      await addDoc(collection(db, 'projects', selectedProjectId, 'tasks'), {
+      await api.createTask({
         title: newTaskTitle.trim(),
         description: 'Newly created task',
         status: status,
         priority: 'medium',
-        assigneeId: user.uid,
         projectId: selectedProjectId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        dueDate: new Date(Date.now() + 86400000 * 7).toISOString(), // 7 days from now
       });
+      
+      // Refresh tasks
+      const tasksData = await api.getTasks();
+      const filteredTasks = selectedProjectId 
+        ? tasksData.filter((t: any) => t.projectId === selectedProjectId)
+        : tasksData;
+      setTasks(filteredTasks);
+      
       setNewTaskTitle('');
       setIsModalOpen(false);
     } catch (error) {

@@ -1,13 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { api } from '../services/api';
 import { UserProfile, AuthState } from '../types';
 
 interface AuthContextType extends AuthState {
-  signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
-  signUpWithEmail: (email: string, pass: string) => Promise<any>;
+  signUpWithEmail: (email: string, pass: string, fullName: string, role?: string) => Promise<any>;
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
 }
@@ -22,122 +19,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    let unsubProfile: (() => void) | null = null;
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Cleanup previous profile listener if exists
-      if (unsubProfile) {
-        unsubProfile();
-        unsubProfile = null;
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setState({ user: null, loading: false, error: null });
+        return;
       }
 
-      if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        
-        // Listen for real-time updates to user profile (e.g. role changes)
-        unsubProfile = onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data() as UserProfile;
-            // Force admin role for the designated user in the DB if it's not set
-            if (firebaseUser.email === 'sazhuni@gmail.com' && data.role !== 'admin') {
-              setDoc(userDocRef, { role: 'admin' }, { merge: true }).catch(console.error);
-            }
-            setState({
-              user: { ...data, uid: firebaseUser.uid }, // Ensure UID is preserved
-              loading: false,
-              error: null,
-            });
-          } else {
-            // Create user profile if it doesn't exist
-            const newUser: UserProfile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              displayName: firebaseUser.displayName || 'User',
-              photoURL: firebaseUser.photoURL || '',
-              role: firebaseUser.email === 'sazhuni@gmail.com' ? 'admin' : 'member',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            setDoc(userDocRef, newUser)
-              .then(() => {
-                setState({ user: newUser, loading: false, error: null });
-              })
-              .catch((err) => {
-                console.error("Error creating profile:", err);
-                setState(prev => ({ ...prev, loading: false, error: err.message }));
-              });
-          }
-        }, (err) => {
-          console.error("Profile snapshot error:", err);
-          setState(prev => ({ ...prev, loading: false, error: err.message }));
-        });
-      } else {
+      try {
+        const user = await api.getProfile(token);
+        setState({ user, loading: false, error: null });
+      } catch (err) {
+        localStorage.removeItem('token');
         setState({ user: null, loading: false, error: null });
       }
-    });
-
-    return () => {
-      unsubscribe();
-      if (unsubProfile) unsubProfile();
     };
+
+    checkAuth();
   }, []);
 
   const signInWithEmail = async (email: string, pass: string) => {
-    const { signInWithEmailAndPassword } = await import('firebase/auth');
     try {
       setState(s => ({ ...s, loading: true, error: null }));
-      await signInWithEmailAndPassword(auth, email, pass);
+      const result = await api.login({ email, password: pass });
+      
+      localStorage.setItem('token', result.token);
+      setState({
+        user: result.data.user,
+        loading: false,
+        error: null,
+      });
     } catch (error: any) {
       setState(s => ({ ...s, loading: false, error: error.message }));
       throw error;
     }
   };
 
-  const signUpWithEmail = async (email: string, pass: string) => {
-    const { createUserWithEmailAndPassword } = await import('firebase/auth');
+  const signUpWithEmail = async (email: string, pass: string, fullName: string, role?: string) => {
     try {
       setState(s => ({ ...s, loading: true, error: null }));
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      return cred;
+      const result = await api.signup({
+        fullName,
+        email,
+        password: pass,
+        role: role || 'member'
+      });
+      
+      localStorage.setItem('token', result.token);
+      setState({
+        user: result.data.user,
+        loading: false,
+        error: null,
+      });
+      return result;
     } catch (error: any) {
       setState(s => ({ ...s, loading: false, error: error.message }));
       throw error;
-    }
-  };
-
-  const signInWithGoogle = async () => {
-    const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
-    const provider = new GoogleAuthProvider();
-    try {
-      setState(s => ({ ...s, loading: true, error: null }));
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      setState(s => ({ ...s, loading: false, error: error.message }));
     }
   };
 
   const signOut = async () => {
-    try {
-      setState(s => ({ ...s, loading: true, error: null }));
-      await auth.signOut();
-    } catch (error: any) {
-      setState(s => ({ ...s, loading: false, error: error.message }));
-    }
+    localStorage.removeItem('token');
+    setState({ user: null, loading: false, error: null });
   };
 
   const updateProfile = async (data: Partial<UserProfile>) => {
-    if (!state.user) return;
-    try {
-      const userDocRef = doc(db, 'users', state.user.uid);
-      await setDoc(userDocRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
-    } catch (error: any) {
-      setState(s => ({ ...s, error: error.message }));
-      throw error;
+    // Note: Backend profile update API not implemented yet in this demo
+    // We update local state for UI consistency
+    if (state.user) {
+      setState(s => ({
+        ...s,
+        user: s.user ? { ...s.user, ...data } : null
+      }));
     }
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updateProfile }}>
+    <AuthContext.Provider value={{ ...state, signInWithEmail, signUpWithEmail, signOut, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

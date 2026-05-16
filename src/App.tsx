@@ -7,6 +7,9 @@ import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Team from './pages/Team';
 import TasksPage from './pages/TasksPage';
+import Profile from './pages/Profile';
+
+import Signup from './pages/Signup';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -26,6 +29,9 @@ export default function App() {
   }
 
   if (!user) {
+    if (currentPath === '/signup') {
+      return <Signup />;
+    }
     return <Login />;
   }
 
@@ -51,6 +57,8 @@ export default function App() {
                 return <TasksPage />;
               case '/team':
                 return <Team />;
+              case '/profile':
+                return <Profile />;
               default:
                 return <Dashboard />;
             }

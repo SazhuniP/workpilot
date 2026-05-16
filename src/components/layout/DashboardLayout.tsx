@@ -1,7 +1,5 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { 
   LayoutDashboard, 
   Briefcase, 
@@ -33,6 +31,7 @@ export function Sidebar() {
     { name: 'Projects', icon: Briefcase, path: '/projects' },
     { name: 'My Tasks', icon: CheckSquare, path: '/tasks' },
     { name: 'Team', icon: Users, path: '/team' },
+    { name: 'Profile', icon: Settings, path: '/profile' },
   ];
 
   return (
@@ -81,17 +80,26 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 mt-auto">
-        <div className="mt-4 flex items-center gap-3 px-2 py-3 border-t border-zinc-800">
+        <div 
+          onClick={() => navigate('/profile')}
+          className="mt-4 flex items-center gap-3 px-2 py-3 border-t border-zinc-800 cursor-pointer hover:bg-zinc-900/50 transition-colors rounded-xl mx-1"
+        >
           <img 
-            src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=random`} 
+            src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.fullName || 'User'}&background=random`} 
             alt="User" 
             className="w-8 h-8 rounded-full border border-zinc-800 shadow-sm"
           />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-white truncate">{user?.displayName}</p>
-            <p className="text-[10px] text-zinc-500 truncate">{user?.email}</p>
+            <p className="text-xs font-semibold text-white truncate">{user?.fullName}</p>
+            <p className="text-[10px] text-zinc-500 truncate lowercase">{user?.role}</p>
           </div>
-          <button onClick={signOut} className="text-zinc-500 hover:text-white transition-colors">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              signOut();
+            }} 
+            className="text-zinc-500 hover:text-white transition-colors p-1"
+          >
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -109,37 +117,9 @@ export function Header({ title }: { title: string }) {
   const [isSearching, setIsSearching] = React.useState(false);
 
   React.useEffect(() => {
-    const performSearch = async () => {
-      if (!searchTerm.trim() || !user) {
-        setResults([]);
-        return;
-      }
-
-      setIsSearching(true);
-      try {
-        const projectsRef = collection(db, 'projects');
-        const qProjects = query(
-          projectsRef, 
-          where('members', 'array-contains', user.uid),
-          limit(5)
-        );
-        const projectsSnap = await getDocs(qProjects);
-        const projectResults = projectsSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as any))
-          .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-          .map(p => ({ id: p.id, title: p.name, type: 'project' as const, path: '/projects' }));
-
-        setResults(projectResults);
-      } catch (error) {
-        console.error('Search error:', error);
-      } finally {
-        setIsSearching(false);
-      }
-    };
-
-    const timer = setTimeout(performSearch, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm, user]);
+    // Search API not implemented in custom backend yet
+    setResults([]);
+  }, [searchTerm]);
 
   return (
     <header className="h-16 border-b border-zinc-800 bg-zinc-950/50 backdrop-blur-sm sticky top-0 z-30 px-8 flex items-center justify-between">

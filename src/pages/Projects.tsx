@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from '../context/NavigationContext';
 import { Project } from '../types';
@@ -21,21 +20,18 @@ export default function Projects() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
-      collection(db, 'projects'),
-      where('members', 'array-contains', user.uid)
-    );
+    const fetchProjects = async () => {
+      try {
+        const projectsData = await api.getProjects();
+        setProjects(projectsData);
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const projectsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Project[];
-      setProjects(projectsData);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchProjects();
   }, [user]);
 
   // Removed handleSeed function
@@ -46,19 +42,13 @@ export default function Projects() {
 
     setIsCreating(true);
     try {
-      const docRef = await addDoc(collection(db, 'projects'), {
+      const project = await api.createProject({
         name: newProjectName.trim(),
         description: 'New workspace created for ' + newProjectName,
-        members: [user.uid],
-        ownerId: user.uid,
-        status: 'active',
-        progress: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
       });
       setNewProjectName('');
       setIsModalOpen(false);
-      navigate(`/tasks?projectId=${docRef.id}`);
+      navigate(`/tasks?projectId=${project._id || project.id}`);
     } catch (error) {
       console.error('Error creating project:', error);
     } finally {

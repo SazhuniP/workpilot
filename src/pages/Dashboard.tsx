@@ -22,8 +22,7 @@ import {
   ArrowUpRight,
   MoreHorizontal
 } from 'lucide-react';
-import { collection, query, where, onSnapshot, collectionGroup } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Card, Badge, GlassCard } from '../components/ui';
@@ -63,32 +62,20 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Listen to projects
-    const qProjects = query(
-      collection(db, 'projects'),
-      where('members', 'array-contains', user.uid)
-    );
-    const unsubProjects = onSnapshot(qProjects, (snap) => {
-      setProjectCount(snap.size);
-    }, (error) => {
-      console.error("Dashboard projects error:", error);
-    });
-
-    // Simple task count - using collectionGroup to match TasksPage
-    const qTasks = query(
-      collectionGroup(db, 'tasks'),
-      where('assigneeId', '==', user.uid)
-    );
-    const unsubTasks = onSnapshot(qTasks, (snap) => {
-      setTaskCount(snap.size);
-    }, (error) => {
-      console.error("Dashboard tasks error:", error);
-    });
-
-    return () => {
-      unsubProjects();
-      unsubTasks();
+    const fetchData = async () => {
+      try {
+        const [projects, tasks] = await Promise.all([
+          api.getProjects(),
+          api.getTasks()
+        ]);
+        setProjectCount(projects.length);
+        setTaskCount(tasks.length);
+      } catch (error) {
+        console.error("Dashboard data error:", error);
+      }
     };
+
+    fetchData();
   }, [user]);
 
   return (
