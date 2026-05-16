@@ -9,15 +9,15 @@ export default function Signup() {
   const { signUpWithEmail, loading, error } = useAuth();
   const { navigate } = useNavigate();
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'member'>('member');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !fullName) return;
+    if (!fullName) return;
     try {
-      await signUpWithEmail(email, password, fullName, role);
+      // Pass fake email/password to keep context method signature
+      const fakeEmail = `${fullName.toLowerCase().replace(/\s+/g, '.')}@guest.local`;
+      await signUpWithEmail(fakeEmail, 'no-password', fullName, role);
       navigate('/');
     } catch (err) {
       // Error handled in context
@@ -35,21 +35,21 @@ export default function Signup() {
             <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-600/20">
               <Zap className="w-6 h-6 text-white fill-white" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Create an account</h1>
-            <p className="text-zinc-500 font-medium tracking-tight">Join the workspace and start managing</p>
+            <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Welcome to WorkPilot</h1>
+            <p className="text-zinc-500 font-medium tracking-tight">Enter your name to start managing</p>
           </div>
 
           <GlassCard className="p-8 border-zinc-800 shadow-2xl bg-zinc-900/40">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Full Name</label>
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Your Full Name</label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
                   <input 
                     type="text" 
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Sazhuni P"
+                    placeholder="E.g. Sazhuni P"
                     required
                     className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/50 transition-all font-medium"
                   />
@@ -57,38 +57,7 @@ export default function Signup() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-                  <input 
-                    type="email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="sazhuni@test.com"
-                    required
-                    className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/50 transition-all font-medium"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-                  <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    minLength={6}
-                    className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/50 transition-all font-medium"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Role</label>
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Choose Role</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -123,18 +92,8 @@ export default function Signup() {
                 className="w-full h-12 text-sm font-bold shadow-[0_0_20px_rgba(79,70,229,0.15)] mt-4"
                 disabled={loading}
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Account'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Get Started'}
               </Button>
-
-              <div className="text-center pt-4">
-                <button 
-                  type="button"
-                  onClick={() => navigate('/login')}
-                  className="text-xs font-bold text-zinc-500 hover:text-indigo-400 transition-colors uppercase tracking-widest"
-                >
-                  Already have an account? Sign In
-                </button>
-              </div>
 
               {error && (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-4">

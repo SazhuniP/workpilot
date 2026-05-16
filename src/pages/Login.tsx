@@ -6,113 +6,34 @@ import { Button, GlassCard } from '../components/ui';
 import { Zap, ArrowLeft, Loader2, Mail, Lock } from 'lucide-react';
 
 export default function Login() {
-  const { signInWithEmail, error, loading } = useAuth();
   const { navigate } = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return;
-    
-    try {
-      await signInWithEmail(email, password);
-      navigate('/');
-    } catch (err) {
-      // Error is handled in AuthContext
-    }
-  };
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 selection:bg-indigo-500 selection:text-white relative overflow-hidden">
-      {/* Background Effect */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(79,70,229,0.15),transparent_50%)]" />
       <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay" />
 
-      <div className="absolute top-8 left-8">
-        <button 
-          onClick={() => navigate('/')} 
-          className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-[10px] font-bold uppercase tracking-[0.2em]"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Back
-        </button>
-      </div>
-
-      <div className="w-full max-w-sm relative z-10">
+      <div className="w-full max-w-sm relative z-10 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
         >
-          <div className="text-center mb-10">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-600/20">
-              <Zap className="w-6 h-6 text-white fill-white" />
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Welcome back</h1>
-            <p className="text-zinc-500 font-medium tracking-tight">Enter your credentials to continue</p>
+          <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-600/20">
+            <Zap className="w-8 h-8 text-white fill-white" />
           </div>
-
-          <GlassCard className="p-8 border-zinc-800 shadow-2xl bg-zinc-900/40">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-                  <input 
-                    type="email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@test.com"
-                    required
-                    className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/50 transition-all font-medium"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-                  <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/50 transition-all font-medium"
-                  />
-                </div>
-              </div>
-              <Button 
-                type="submit"
-                variant="primary" 
-                className="w-full h-12 text-sm font-bold shadow-[0_0_20px_rgba(79,70,229,0.15)] mt-2"
-                disabled={loading}
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign in'}
-              </Button>
-
-              <div className="text-center pt-4">
-                <button 
-                  type="button"
-                  onClick={() => navigate('/signup')}
-                  className="text-xs font-bold text-zinc-500 hover:text-indigo-400 transition-colors uppercase tracking-widest"
-                >
-                  Don't have an account? Create one
-                </button>
-              </div>
-
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-4">
-                  <p className="text-[10px] uppercase font-bold tracking-widest text-red-500 text-center leading-relaxed">
-                    {error}
-                  </p>
-                </div>
-              )}
-            </form>
-          </GlassCard>
-
-          <p className="mt-10 text-center text-[10px] uppercase font-bold tracking-widest text-zinc-600">
-            WorkPilot Management System
+          <h1 className="text-4xl font-black tracking-tight text-white mb-4 uppercase">WorkPilot</h1>
+          <p className="text-zinc-500 font-medium mb-12 uppercase tracking-[0.2em] text-[10px]">Next Gen Workspace Management</p>
+          
+          <Button 
+            onClick={() => navigate('/signup')}
+            variant="primary" 
+            className="w-full h-14 text-sm font-bold shadow-[0_0_30px_rgba(79,70,229,0.2)] mb-4"
+          >
+            Enter Workspace
+          </Button>
+          
+          <p className="text-[10px] uppercase font-bold tracking-widest text-zinc-600 mt-8">
+            No authentication required • Version 2.0
           </p>
         </motion.div>
       </div>

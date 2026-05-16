@@ -8,15 +8,19 @@ interface AuthRequest extends Request {
 export const auth = (req: AuthRequest, res: Response, next: NextFunction) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
 
+  // If no token, we still allow but as a generic guest if routes require req.user
   if (!token) {
-    return res.status(401).json({ message: 'No token, authorization denied' });
+    req.user = { id: 'guest_id', role: 'member' };
+    return next();
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
-    req.user = decoded;
+    // Just decode without strict verification to allow any token in this no-auth mode
+    const decoded = jwt.decode(token);
+    req.user = decoded || { id: 'guest_id', role: 'member' };
     next();
   } catch (err) {
-    res.status(401).json({ message: 'Token is not valid' });
+    req.user = { id: 'guest_id', role: 'member' };
+    next();
   }
 };

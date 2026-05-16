@@ -11,33 +11,38 @@ const signToken = (id: string) => {
 
 export const signup = async (req: Request, res: Response) => {
   try {
-    const { fullName, email, password, role } = req.body;
+    const { fullName, email, role } = req.body;
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+    let user = await User.findOne({ email });
+    if (user) {
+      // If user exists, we just treat it as a "login" in this no-auth mode
+      const token = signToken(user._id.toString());
+      return res.status(200).json({
+        status: 'success',
+        token,
+        data: { user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role } },
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    const newUser = await User.create({
+    // Create user without real password security
+    user = await User.create({
       fullName,
       email,
-      password: hashedPassword,
+      password: 'no-password-needed',
       role: role || 'member',
     });
 
-    const token = signToken(newUser._id.toString());
+    const token = signToken(user._id.toString());
 
     res.status(201).json({
       status: 'success',
       token,
       data: {
         user: {
-          id: newUser._id,
-          fullName: newUser.fullName,
-          email: newUser.email,
-          role: newUser.role,
+          id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          role: user.role,
         },
       },
     });
@@ -48,16 +53,16 @@ export const signup = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Please provide email and password' });
+    if (!email) {
+      return res.status(400).json({ message: 'Please provide email' });
     }
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email });
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: 'Incorrect email or password' });
+    if (!user) {
+      return res.status(401).json({ message: 'User not found. Please sign up.' });
     }
 
     const token = signToken(user._id.toString());

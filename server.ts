@@ -79,8 +79,17 @@ async function startServer() {
   const connectDB = async () => {
     let MONGODB_URI = process.env.MONGODB_URI;
     
-    if (!MONGODB_URI || MONGODB_URI === '123') {
-      console.warn('Valid MONGODB_URI not found. Starting In-Memory MongoDB Server...');
+    const isValidUri = (uri: string | undefined): uri is string => {
+      return !!uri && (uri.startsWith('mongodb://') || uri.startsWith('mongodb+srv://'));
+    };
+    
+    if (!isValidUri(MONGODB_URI)) {
+      if (MONGODB_URI && MONGODB_URI !== '123') {
+         console.warn(`Invalid MONGODB_URI detected: ${MONGODB_URI}. Falling back to In-Memory instance.`);
+      } else {
+         console.warn('No valid MONGODB_URI found. Starting In-Memory MongoDB Server...');
+      }
+      
       try {
         const mongoServer = await MongoMemoryServer.create();
         MONGODB_URI = mongoServer.getUri();
@@ -90,13 +99,14 @@ async function startServer() {
       }
     }
 
-    if (MONGODB_URI) {
+    if (isValidUri(MONGODB_URI)) {
       try {
         await mongoose.connect(MONGODB_URI);
         console.log('MongoDB connected successfully');
         await seedData();
       } catch (err) {
         console.error('MongoDB connection error:', err);
+        // Secondary fallback if the "valid" looking URI fails at runtime
         console.log('Attempting fallback to In-Memory MongoDB...');
         try {
           const mongoServer = await MongoMemoryServer.create();
